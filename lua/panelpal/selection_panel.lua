@@ -16,10 +16,11 @@ local Highlight = {
 ---@field win integer
 ---@field height integer
 ---@field options string[]
----@field multi_selectioin boolean
+---@field multi_selection boolean
 ---@field selected {[integer]: boolean}
----@field _on_select_callback fun(self: SelectionPanel, index: integer)?
----@field _on_unselect_callback fun(self: SelectionPanel, index: integer)?
+---@field _on_select_callback? fun(self: SelectionPanel, index: integer)
+---@field _on_unselect_callback? fun(self: SelectionPanel, index: integer)
+---@field _selection_checker? fun(self: SelectionPanel, index: integer): boolean
 local SelectionPanel = {}
 M.SelectionPanel = SelectionPanel
 
@@ -37,10 +38,11 @@ function SelectionPanel:new(args)
         win = nil,
         height = args.height or 15,
         options = args.options or {},
-        multi_selectioin = args.multi_selectioin or false,
+        multi_selection = args.multi_selection or false,
         selected = {},
         _on_select_callback = args.on_select_callback or nil,
         _on_unselect_callback = args.on_unselect_callback or nil,
+        _selection_checker = args.selection_checker or nil,
     }
 
     setmetatable(obj, self)
@@ -78,6 +80,11 @@ function SelectionPanel:set_on_unselect(callback)
     self._on_unselect_callback = callback
 end
 
+---@param callback? fun(self: SelectionPanel, index: integer): boolean
+function SelectionPanel:set_selection_checker(callback)
+   self._selection_checker = callback
+end
+
 ---@param index integer
 function SelectionPanel:on_select(index)
     self:update_option(index)
@@ -98,6 +105,7 @@ function SelectionPanel:clear_selectioin()
     local selected = self.selected
     for i in pairs(selected) do
         selected[i] = false
+        self:on_unselect(i)
         self:update_option(i)
     end
 end
@@ -105,18 +113,8 @@ end
 ---@param index integer
 function SelectionPanel:toggle_selection(index)
     local is_selected = not self.selected[index]
-
-    if is_selected and not self.multi_selectioin then
-            self:clear_selectioin()
-    end
-
-    self.selected[index] = is_selected
-
-    if is_selected then
-        self:on_select(index)
-    else
-        self:on_unselect(index)
-    end
+    local target = is_selected and self.select or self.unselect
+    target(self, index)
 end
 
 ---@param index integer
@@ -124,7 +122,10 @@ function SelectionPanel:select(index)
     local is_selected = self.selected[index]
     if is_selected then return end
 
-    if not self.multi_selectioin then
+    local checker = self._selection_checker
+    if checker and not checker(self, index) then return end
+
+    if not self.multi_selection then
         self:clear_selectioin()
     end
 
@@ -135,9 +136,9 @@ end
 ---@param index integer
 function SelectionPanel:unselect(index)
     local is_selected = self.selected[index]
-    if is_selected then return end
+    if not is_selected then return end
 
-    self.selected[index] = false
+    self.selected[index] = nil
     self:on_unselect(index)
 end
 

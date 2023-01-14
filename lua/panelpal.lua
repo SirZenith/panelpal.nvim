@@ -82,6 +82,19 @@ function M.list_visible_buf(tabpage)
     return result
 end
 
+---@param msg string
+function M.ask_for_confirmation(msg)
+    local answer = vim.fn.input(msg .. " [Y/N]: ")
+    if answer == "Y" or answer == "y" then
+        return true
+    elseif answer == "N" or answer == "n" then
+        return false
+    else
+        vim.notify("Please answer with Y or N (case insensitive).")
+        return false
+    end
+end
+
 -- -----------------------------------------------------------------------------
 -- Scroll
 
