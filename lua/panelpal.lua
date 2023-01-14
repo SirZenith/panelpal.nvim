@@ -326,7 +326,11 @@ end
 
 M.default_position_for_new_window = PanelPosition.right
 
-function M.setup()
+function M.setup(config)
+    config = config or {}
+
+    M.default_position_for_new_window = config.default_position_for_new_window
+        or PanelPosition.right
 end
 
 return M
