@@ -82,6 +82,9 @@ function M.list_visible_buf(tabpage)
     return result
 end
 
+-- -----------------------------------------------------------------------------
+-- Scroll
+
 ---@param win integer
 ---@param method ScrollMethod
 ---@param offset? integer
@@ -104,8 +107,6 @@ function M.scroll_win(win, method, offset)
 
     to_line = math.max(1, math.min(line_cnt, to_line + offset))
     vim.api.nvim_win_set_cursor(win, { to_line, 0 })
-
-    vim.api.nvim_win_set_cursor(cur_win, cur_pos)
 end
 
 function M.scroll_win_to_top(win)
@@ -115,6 +116,9 @@ end
 function M.scroll_win_to_bottom(win)
     M.scroll_win(win, ScrollMethod.bottom)
 end
+
+-- -----------------------------------------------------------------------------
+-- Find & Create
 
 ---@param pos PanelPosition
 ---@param buf integer # 需要绑定到新窗口的 buffer 编号
@@ -145,6 +149,28 @@ function M.create_panel(buf, pos, is_switch_to)
     return win
 end
 
+
+---@param buf integer
+---@param is_in_current_tabpage boolean
+---@return integer? winnr
+function M.find_win_with_buf(buf, is_in_current_tabpage)
+    if not buf then return nil end
+
+    local wins = is_in_current_tabpage
+        and vim.api.nvim_tabpage_list_wins(0)
+        or vim.api.nvim_list_wins()
+
+    local win
+    for _, w in ipairs(wins) do
+        if vim.api.nvim_win_get_buf(w) == buf then
+            win = w
+            break
+        end
+    end
+
+    return win
+end
+
 ---@param name string
 ---@return integer? buf_num # 匹配 buffer 的编号
 ---@return integer? win_num # 包含此 buffer 的窗口的编号
@@ -159,15 +185,7 @@ function M.find_buf_with_name(name)
 
         if buf_name == name then
             buf_num = buf
-
-            -- 可见性检验
-            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-                if vim.api.nvim_win_get_buf(win) == buf_num then
-                    win_num = win
-                    break
-                end
-            end
-
+            win_num = M.find_win_with_buf(buf_num, true)
             break
         end
     end
@@ -221,6 +239,9 @@ function M.toggle_panel_visibility(name)
 
     return buf, win
 end
+
+-- -----------------------------------------------------------------------------
+-- Write
 
 ---@param buf integer
 ---@param content any
