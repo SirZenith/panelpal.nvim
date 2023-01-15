@@ -18,6 +18,8 @@ local M = {}
 ---@field sidebar_width integer
 ---@field bottom_panel_height integer
 ---@field top_panel_height integer
+--
+---@field _keymap {[string]: string}
 local TabPage = {
     sidebar_width = 25,
     bottom_panel_height = 10,
@@ -29,14 +31,33 @@ M.TabPage = TabPage
 function TabPage:new(config)
     self.__index = self
 
+    config = config or {}
     local obj = {}
-    for k, v in ipairs(config or {}) do
+    for k, v in pairs(config) do
         obj[k] = v
     end
+
+    obj._keymap = obj.keymap
+    obj.keymap = nil
 
     obj.win_vsplit = {}
 
     return setmetatable(obj, self)
+end
+
+function TabPage:_set_buf_keymap(bufnr)
+    local keymap = self._keymap
+    if not keymap then return end
+
+    local opts = { noremap = true, silent = true, buffer = bufnr }
+    for name, key in pairs(keymap) do
+        local method = self[name]
+        if method then
+            vim.keymap.set("n", key, function()
+                method(self)
+            end, opts)
+        end
+    end
 end
 
 -- -----------------------------------------------------------------------------
@@ -105,7 +126,11 @@ function TabPage:vsplit_into(cnt)
     local cur_win = api.nvim_get_current_win()
     for _ = split_cnt + 1, cnt do
         vim.cmd "botright vsplit"
-        win_vsplit[#win_vsplit + 1] = api.nvim_get_current_win()
+        local win = api.nvim_get_current_win()
+        win_vsplit[#win_vsplit + 1] = win
+
+        local buf = api.nvim_win_get_buf(win)
+        self:_set_buf_keymap(buf)
     end
     api.nvim_set_current_win(cur_win)
 
@@ -132,6 +157,7 @@ function TabPage:set_vsplit_buf(index, bufnr)
     if not win then return end
 
     api.nvim_win_set_buf(win, bufnr)
+    self:_set_buf_keymap(bufnr)
 end
 
 -- -----------------------------------------------------------------------------
@@ -186,12 +212,16 @@ function TabPage:_show_common(key, key_size, sp_mod, sp_cmd, key_bufnr, bufnr)
         api.nvim_set_current_win(cur_win)
         self[key] = win
     end
+    api.nvim_set_current_win(win)
 
     bufnr = bufnr or self[key_bufnr]
     if bufnr then
-        self[key_bufnr] = bufnr
         api.nvim_win_set_buf(win, bufnr)
     end
+
+    bufnr = api.nvim_win_get_buf(win)
+    self[key_bufnr] = bufnr
+    self:_set_buf_keymap(bufnr)
 
     return win
 end
@@ -203,6 +233,13 @@ function TabPage:_hide_common(key)
 
     api.nvim_win_hide(win)
     self[key] = nil
+end
+
+function TabPage:_focus_common(key)
+    local win = self:_get_winnr_common(key)
+    if not win then return end
+
+    api.nvim_set_current_win(win)
 end
 
 -- -----------------------------------------------------------------------------
@@ -233,6 +270,10 @@ function TabPage:hide_sidebar()
     self:_hide_common("winnr_sidebar")
 end
 
+function TabPage:focus_sidebar()
+    self:_focus_common("winnr_sidebar")
+end
+
 -- -----------------------------------------------------------------------------
 -- Bottom Panel
 
@@ -260,6 +301,10 @@ function TabPage:hide_bottom_panel()
     self:_hide_common("winnr_bottom_panel")
 end
 
+function TabPage:focus_bottom_panel()
+    self:_focus_common("winnr_bottom_panel")
+end
+
 -- -----------------------------------------------------------------------------
 -- Top Panel
 
@@ -285,6 +330,10 @@ end
 
 function TabPage:hide_top_panel()
     self:_hide_common("winnr_top_panel")
+end
+
+function TabPage:focus_top_panel()
+    self:_focus_common("winnr_top_panel")
 end
 
 -- -----------------------------------------------------------------------------
