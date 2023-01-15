@@ -162,7 +162,6 @@ function M.create_panel(buf, pos, is_switch_to)
     return win
 end
 
-
 ---@param buf integer
 ---@param is_in_current_tabpage boolean
 ---@return integer? winnr

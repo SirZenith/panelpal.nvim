@@ -1,13 +1,15 @@
-local panelpal = require "panelpal"
+local api = vim.api
 
 local M = {}
 
-M.selected_symbol   = "  [■] "
-M.unselected_symbol = "   □  "
+M.selected_symbol     = "  [■] "
+M.unselected_symbol   = "   □  "
+M.unselectable_symbol = "      "
 
 local Highlight = {
     select = "PanelpalSelect",
     unselect = "PanelpalUnselect",
+    unselectable = "PanelpalUnselectable",
 }
 
 ---@class SelectionPanel
@@ -15,35 +17,40 @@ local Highlight = {
 ---@field buf integer
 ---@field win integer
 ---@field height integer
----@field options string[]
+--
 ---@field multi_selection boolean
+---@field options string[]
 ---@field selected {[integer]: boolean}
+--
 ---@field _on_select_callback? fun(self: SelectionPanel, index: integer)
 ---@field _on_unselect_callback? fun(self: SelectionPanel, index: integer)
 ---@field _selection_checker? fun(self: SelectionPanel, index: integer): boolean
-local SelectionPanel = {}
+local SelectionPanel = {
+    name = "select-panel",
+    height = 15,
+    multi_selection = false,
+}
 M.SelectionPanel = SelectionPanel
 
+---@param config? table
 ---@return SelectionPanel
-function SelectionPanel:new(args)
+function SelectionPanel:new(config)
     self.__index = self
 
-    local name = args.name or "select-panel"
-    local buf = panelpal.find_or_create_buf_with_name(name)
+    config = config or {}
+    local obj = {}
+    for k, v in pairs(config) do
+        obj[k] = v
+    end
+
+    local name = obj.name or self.name
+    local buf = api.nvim_create_buf(false, true)
+    api.nvim_buf_set_name(buf, name)
     vim.bo[buf].buftype = "nofile"
 
-    local obj = {
-        name = name,
-        buf = buf,
-        win = nil,
-        height = args.height or 15,
-        options = args.options or {},
-        multi_selection = args.multi_selection or false,
-        selected = {},
-        _on_select_callback = args.on_select_callback or nil,
-        _on_unselect_callback = args.on_unselect_callback or nil,
-        _selection_checker = args.selection_checker or nil,
-    }
+    obj.buf = buf
+    obj.options = {}
+    obj.selected = {}
 
     setmetatable(obj, self)
     obj:setup_keymapping()
@@ -62,10 +69,22 @@ function SelectionPanel:setup_keymapping()
     end
 
     nmap("<cr>", function()
-        local pos = vim.api.nvim_win_get_cursor(0)
+        local pos = api.nvim_win_get_cursor(0)
         local index = pos[1]
         self:toggle_selection(index)
     end)
+end
+
+---@return integer? bufnr
+function SelectionPanel:get_buffer()
+    local buf = self.buf
+    if not buf or not vim.api.nvim_buf_is_valid(buf) then
+        buf = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_buf_set_name(self.name)
+        self.buf = buf
+    end
+
+    return buf ~= 0 and buf or nil
 end
 
 -- -----------------------------------------------------------------------------
@@ -148,25 +167,25 @@ function SelectionPanel:show()
     local buf, win = self.buf, self.win
     if not buf then
         return
-    elseif not win or not vim.api.nvim_win_is_valid(win) then
+    elseif not win or not api.nvim_win_is_valid(win) then
         vim.cmd "belowright split"
-        win = vim.api.nvim_get_current_win()
-        vim.api.nvim_win_set_buf(win, self.buf)
+        win = api.nvim_get_current_win()
+        api.nvim_win_set_buf(win, self.buf)
 
         self.win = win
     end
 
-    vim.api.nvim_win_set_height(win, self.height)
+    api.nvim_win_set_height(win, self.height)
     self:update_options()
 end
 
 function SelectionPanel:hide()
     local win = self.win
-    if not win or vim.api.nvim_win_is_valid() == 0 then
+    if not win or api.nvim_win_is_valid() == 0 then
         return
     end
 
-    vim.api.nvim_win_hide(win)
+    api.nvim_win_hide(win)
 end
 
 function SelectionPanel:update_options()
@@ -181,15 +200,34 @@ function SelectionPanel:update_option(index)
     if not option then return end
 
     local is_selected = self.selected[index]
-    local symbol = is_selected and M.selected_symbol or M.unselected_symbol
+    local is_selectable = true
+    local checker = self._selection_checker
+    if checker then
+        is_selectable = checker(self, index)
+    end
+
+    local symbol, hl_name
+    if not is_selectable then
+        symbol = M.unselectable_symbol
+        hl_name = Highlight.unselectable
+    elseif is_selected then
+        symbol = M.selected_symbol
+        hl_name = Highlight.select
+    else
+        symbol = M.unselected_symbol
+        hl_name = Highlight.unselect
+    end
+
     local buf = self.buf
-
     local line_index = index - 1
-    local lines = { symbol .. option }
-    vim.api.nvim_buf_set_lines(buf, line_index, line_index + 1, false, lines)
+    local lines = is_selectable and {
+        symbol .. option
+    } or {
+        option ~= "" and (symbol .. option) or ""
+    }
 
-    local hl_name = is_selected and Highlight.select or Highlight.unselect
-    vim.api.nvim_buf_add_highlight(buf, 0, hl_name, line_index, 0, #symbol)
+    api.nvim_buf_set_lines(buf, line_index, line_index + 1, false, lines)
+    api.nvim_buf_add_highlight(buf, 0, hl_name, line_index, 0, #symbol)
 end
 
 -- -----------------------------------------------------------------------------
