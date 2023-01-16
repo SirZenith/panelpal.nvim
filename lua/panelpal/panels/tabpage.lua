@@ -50,8 +50,14 @@ function TabPage:_set_buf_keymap(bufnr)
     if not keymap then return end
 
     local opts = { noremap = true, silent = true, buffer = bufnr }
-    for name, key in pairs(keymap) do
-        local method = self[name]
+    for name, value in pairs(keymap) do
+        local key, method
+        if type(value) == "function" then
+            key, method = name, value
+        else
+            key, method = value, self[name]
+        end
+
         if method then
             vim.keymap.set("n", key, function()
                 method(self)
