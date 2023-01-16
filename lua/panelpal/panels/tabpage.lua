@@ -51,10 +51,14 @@ function TabPage:_set_buf_keymap(bufnr)
 
     local opts = { noremap = true, silent = true, buffer = bufnr }
     for name, value in pairs(keymap) do
+        if type(name) ~= "string" then
+            error("keymap key for TabPage must be string (got " .. type(name) .. ")")
+        end
+
         local key, method
         if type(value) == "function" then
             key, method = name, value
-        else
+        elseif type(self[name]) == "function" then
             key, method = value, self[name]
         end
 
@@ -62,6 +66,12 @@ function TabPage:_set_buf_keymap(bufnr)
             vim.keymap.set("n", key, function()
                 method(self)
             end, opts)
+        elseif type(value) == "string" then
+            vim.keymap.set("n", name, value, opts)
+        else
+            vim.notify(("failed to set keymap: %s, %s"):format(
+                vim.inspect(name), vim.inspect(value)
+            ))
         end
     end
 end
