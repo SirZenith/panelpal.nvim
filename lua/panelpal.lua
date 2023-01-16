@@ -1,3 +1,5 @@
+local api = vim.api
+
 local M = {}
 
 ---@enum PanelPosition
@@ -28,12 +30,19 @@ M.PanelContentUpdateMethod = PanelContentUpdateMethod
 -- -----------------------------------------------------------------------------
 
 ---@param method PanelContentUpdateMethod
+---@param buf? integer
 ---@return integer line_st
 ---@return integer line_ed
-function M.update_method_to_line_range(method)
+function M.update_method_to_line_range(method, buf)
     local line_st, line_ed = -1, -1
     if method == PanelContentUpdateMethod.append then
         line_st, line_st = -1, -1
+        if buf
+            and api.nvim_buf_line_count(buf) == 1
+            and api.nvim_buf_get_lines(buf, 0, 1, true)[1] == ""
+        then
+            line_st = 0
+        end
     elseif method == PanelContentUpdateMethod.override then
         line_st, line_ed = 0, -1
     elseif method == PanelContentUpdateMethod.prepend then
@@ -64,7 +73,7 @@ function M.visual_selection_text()
     local st_r, st_c, ed_r, ed_c = M.visual_selection_range()
     if not (st_r or st_c or ed_r or ed_c) then return nil end
 
-    local list = vim.api.nvim_buf_get_text(0, st_r, st_c, ed_r, ed_c, {})
+    local list = api.nvim_buf_get_text(0, st_r, st_c, ed_r, ed_c, {})
     local selected = table.concat(list)
     return #selected ~= 0 and selected or nil
 end
@@ -74,9 +83,9 @@ end
 ---@return integer[] bufs
 function M.list_visible_buf(tabpage)
     local result = {}
-    local wins = vim.api.nvim_tabpage_list_wins(tabpage)
+    local wins = api.nvim_tabpage_list_wins(tabpage)
     for _, win in ipairs(wins) do
-        local buf = vim.api.nvim_win_get_buf(win)
+        local buf = api.nvim_win_get_buf(win)
         table.insert(result, buf)
     end
     return result
@@ -103,11 +112,11 @@ end
 ---@param offset? integer
 function M.scroll_win(win, method, offset)
     offset = offset or 0
-    local cur_win = vim.api.nvim_get_current_win()
-    local cur_pos = vim.api.nvim_win_get_cursor(cur_win)
+    local cur_win = api.nvim_get_current_win()
+    local cur_pos = api.nvim_win_get_cursor(cur_win)
 
-    local buf = vim.api.nvim_win_get_buf(win)
-    local line_cnt = vim.api.nvim_buf_line_count(buf)
+    local buf = api.nvim_win_get_buf(win)
+    local line_cnt = api.nvim_buf_line_count(buf)
 
     local to_line = line_cnt
     if method == ScrollMethod.top then
@@ -119,7 +128,7 @@ function M.scroll_win(win, method, offset)
     end
 
     to_line = math.max(1, math.min(line_cnt, to_line + offset))
-    vim.api.nvim_win_set_cursor(win, { to_line, 0 })
+    api.nvim_win_set_cursor(win, { to_line, 0 })
 end
 
 function M.scroll_win_to_top(win)
@@ -138,7 +147,7 @@ end
 ---@param is_switch_to boolean # 是否需要在创建窗口之后即跳转到新窗口
 ---@return integer win # 新创建的窗口的
 function M.create_panel(buf, pos, is_switch_to)
-    local cur_win = vim.api.nvim_get_current_win()
+    local cur_win = api.nvim_get_current_win()
 
     local cmd = "vsplit"
     if pos == PanelPosition.top then
@@ -152,11 +161,11 @@ function M.create_panel(buf, pos, is_switch_to)
     end
 
     vim.cmd(cmd)
-    local win = vim.api.nvim_get_current_win()
-    vim.api.nvim_win_set_buf(win, buf)
+    local win = api.nvim_get_current_win()
+    api.nvim_win_set_buf(win, buf)
 
     if not is_switch_to then
-        vim.api.nvim_set_current_win(cur_win)
+        api.nvim_set_current_win(cur_win)
     end
 
     return win
@@ -169,12 +178,12 @@ function M.find_win_with_buf(buf, is_in_current_tabpage)
     if not buf then return nil end
 
     local wins = is_in_current_tabpage
-        and vim.api.nvim_tabpage_list_wins(0)
-        or vim.api.nvim_list_wins()
+        and api.nvim_tabpage_list_wins(0)
+        or api.nvim_list_wins()
 
     local win
     for _, w in ipairs(wins) do
-        if vim.api.nvim_win_get_buf(w) == buf then
+        if api.nvim_win_get_buf(w) == buf then
             win = w
             break
         end
@@ -190,9 +199,9 @@ function M.find_buf_with_name(name)
     local buf_num, win_num = nil, nil
 
     -- 存在性检验
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    for _, buf in ipairs(api.nvim_list_bufs()) do
         -- 此接口无法获取 buffer 的显示名
-        -- buf_name = vim.api.nvim_buf_get_name(buf)
+        -- buf_name = api.nvim_buf_get_name(buf)
         local buf_name = vim.fn.bufname(buf)
 
         if buf_name == name then
@@ -212,8 +221,8 @@ function M.find_or_create_buf_with_name(name)
     local buf, win = M.find_buf_with_name(name)
 
     if not buf then
-        buf = vim.api.nvim_create_buf(true, false)
-        vim.api.nvim_buf_set_name(buf, name)
+        buf = api.nvim_create_buf(true, false)
+        api.nvim_buf_set_name(buf, name)
     end
 
     return buf, win
@@ -231,7 +240,7 @@ function M.set_panel_visibility(name, is_visible)
     if not win and is_visible then
         win = M.create_panel(buf, M.default_position_for_new_window, false)
     elseif win and not is_visible then
-        vim.api.nvim_win_hide(win)
+        api.nvim_win_hide(win)
     end
 
     return buf, win
@@ -246,7 +255,7 @@ function M.toggle_panel_visibility(name)
     if not win then
         win = M.create_panel(buf, M.default_position_for_new_window, false)
     elseif win then
-        vim.api.nvim_win_hide(win)
+        api.nvim_win_hide(win)
     end
 
     return buf, win
@@ -273,7 +282,7 @@ function M.write_lines_to_buf(buf, content, line_st, line_ed)
     else
         lines = { tostring(content) }
     end
-    vim.api.nvim_buf_set_lines(buf, line_st, line_ed, true, lines)
+    api.nvim_buf_set_lines(buf, line_st, line_ed, true, lines)
 
     return #lines
 end
@@ -323,16 +332,16 @@ end
 ---@param content any
 ---@param method PanelContentUpdateMethod
 function M.write_to_buf_with_highlight(buf, hl_name, content, method)
-    local line_st, line_ed = M.update_method_to_line_range(method)
+    local line_st, line_ed = M.update_method_to_line_range(method, buf)
     local line_cnt = M.write_lines_to_buf(buf, content, line_st, line_ed)
-    local content_line_cnt = vim.api.nvim_buf_line_count(buf)
+    local content_line_cnt = api.nvim_buf_line_count(buf)
 
     if line_st < 0 then
         line_st = content_line_cnt - line_cnt
     end
 
     for l = line_st, line_st + line_cnt do
-        vim.api.nvim_buf_add_highlight(buf, 0, hl_name, l, 0, -1)
+        api.nvim_buf_add_highlight(buf, 0, hl_name, l, 0, -1)
     end
 end
 
@@ -345,13 +354,13 @@ function M.write_to_panel_with_highlight(name, hl_name, content, method, is_need
     local line_st, line_ed = M.update_method_to_line_range(method)
     local buf, _, line_cnt = M.write_lines_to_panel(name, content, line_st, line_ed, is_need_show)
 
-    local content_line_cnt = vim.api.nvim_buf_line_count(buf)
+    local content_line_cnt = api.nvim_buf_line_count(buf)
     if line_st < 0 then
         line_st = content_line_cnt - line_cnt
     end
 
     for l = line_st, line_st + line_cnt do
-        vim.api.nvim_buf_add_highlight(buf, 0, hl_name, l, 0, -1)
+        api.nvim_buf_add_highlight(buf, 0, hl_name, l, 0, -1)
     end
 end
 
