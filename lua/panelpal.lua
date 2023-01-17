@@ -104,35 +104,54 @@ function M.ask_for_confirmation(msg)
     end
 end
 
----@param msg string
----@param popup_msg string
-function M.ask_for_confirmation_with_popup(msg, popup_msg)
-    local buf = api.nvim_create_buf(false, true)
+---@param msg_lines string[]
+---@param on_confirm fun(ok: boolean)
+function M.ask_for_confirmation_with_popup(msg_lines, on_confirm)
+    if type(on_confirm) ~= "function" then
+        error("on_confirm is supposed to be a function")
+    end
 
-    local lines = vim.split(popup_msg, "\n")
-    local line_cnt = #lines
-    api.nvim_buf_set_lines(buf, 0, -1, true, lines)
+    local buf = api.nvim_create_buf(false, true)
+    if buf == 0 then
+        vim.notify("failed to create popup buffer.")
+        return
+    end
+
+    M.write_to_buf_with_highlight(
+        buf, "Search", "-- Press 'Enter' to confirm, 'Escape' to cancel.",
+        PanelContentUpdateMethod.append
+    )
+    M.write_to_buf(buf, "", PanelContentUpdateMethod.append)
+    M.write_to_buf(buf, msg_lines, PanelContentUpdateMethod.append)
+
+    local line_cnt = #msg_lines + 2
 
     local editor_w, editor_h = vim.o.columns, vim.o.lines
-    local w = math.min(50, editor_w)
+    local w = math.min(80, editor_w)
     local h = math.min(line_cnt, editor_h)
     local row = math.floor((editor_h - h) / 2)
     local col = math.floor((editor_w - w) / 2)
 
-    local win = api.nvim_open_win(buf, false, {
+    local win = api.nvim_open_win(buf, true, {
         width = w, height = h, row = row, col = col,
         relative = "editor",
         border = "rounded",
     })
 
+    local opts = { noremap = true, silent = true, buffer = buf }
+    vim.keymap.set("n", "<esc>", function()
+        on_confirm(false)
+        api.nvim_win_close(win, true)
+        api.nvim_buf_delete(buf, {})
+    end, opts)
+    vim.keymap.set("n", "<cr>", function()
+        on_confirm(true)
+        api.nvim_win_close(win, true)
+        api.nvim_buf_delete(buf, {})
+    end, opts)
+
     vim.bo[buf].modifiable = false
-    local ok = M.ask_for_confirmation(msg)
-    api.nvim_win_close(win, true)
-
-    return ok
 end
-
-M.ask_for_confirmation_with_popup("test", "this is only for testing")
 
 -- -----------------------------------------------------------------------------
 -- Scroll
