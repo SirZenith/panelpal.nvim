@@ -104,6 +104,36 @@ function M.ask_for_confirmation(msg)
     end
 end
 
+---@param msg string
+---@param popup_msg string
+function M.ask_for_confirmation_with_popup(msg, popup_msg)
+    local buf = api.nvim_create_buf(false, true)
+
+    local lines = vim.split(popup_msg, "\n")
+    local line_cnt = #lines
+    api.nvim_buf_set_lines(buf, 0, -1, true, lines)
+
+    local editor_w, editor_h = vim.o.columns, vim.o.lines
+    local w = math.min(50, editor_w)
+    local h = math.min(line_cnt, editor_h)
+    local row = math.floor((editor_h - h) / 2)
+    local col = math.floor((editor_w - w) / 2)
+
+    local win = api.nvim_open_win(buf, false, {
+        width = w, height = h, row = row, col = col,
+        relative = "editor",
+        border = "rounded",
+    })
+
+    vim.bo[buf].modifiable = false
+    local ok = M.ask_for_confirmation(msg)
+    api.nvim_win_close(win, true)
+
+    return ok
+end
+
+M.ask_for_confirmation_with_popup("test", "this is only for testing")
+
 -- -----------------------------------------------------------------------------
 -- Scroll
 
