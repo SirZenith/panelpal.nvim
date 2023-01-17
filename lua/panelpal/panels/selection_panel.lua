@@ -189,6 +189,9 @@ function SelectionPanel:hide()
 end
 
 function SelectionPanel:update_options()
+    local buf = self:get_buffer()
+    api.nvim_buf_set_lines(buf, 0, -1, true, {})
+
     for i = 1, #self.options do
         self:update_option(i)
     end
