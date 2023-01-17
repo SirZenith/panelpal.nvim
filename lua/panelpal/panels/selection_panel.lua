@@ -1,4 +1,5 @@
 local api = vim.api
+local panelpal = require "panelpal"
 
 local M = {}
 
@@ -190,7 +191,9 @@ end
 
 function SelectionPanel:update_options()
     local buf = self:get_buffer()
-    api.nvim_buf_set_lines(buf, 0, -1, true, {})
+    if not buf then return end
+
+    panelpal.clear_buffer_contnet(buf)
 
     for i = 1, #self.options do
         self:update_option(i)

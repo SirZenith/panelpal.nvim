@@ -265,6 +265,11 @@ end
 -- Write
 
 ---@param buf integer
+function M.clear_buffer_contnet(buf)
+    api.nvim_buf_set_lines(buf, 0, -1, true, {})
+end
+
+---@param buf integer
 ---@param content any
 ---@param line_st integer
 ---@param line_ed integer
