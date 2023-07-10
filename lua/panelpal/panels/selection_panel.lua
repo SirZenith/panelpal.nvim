@@ -124,7 +124,7 @@ end
 function SelectionPanel:clear_selectioin()
     local selected = self.selected
     for i in pairs(selected) do
-        selected[i] = false
+        selected[i] = nil
         self:on_unselect(i)
         self:update_option(i)
     end
