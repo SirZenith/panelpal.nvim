@@ -182,7 +182,7 @@ end
 
 function SelectionPanel:hide()
     local win = self.win
-    if not win or api.nvim_win_is_valid() == 0 then
+    if not win or api.nvim_win_is_valid(win) == 0 then
         return
     end
 
