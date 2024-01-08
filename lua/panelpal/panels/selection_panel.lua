@@ -81,7 +81,7 @@ function SelectionPanel:get_buffer()
     local buf = self.buf
     if not buf or not vim.api.nvim_buf_is_valid(buf) then
         buf = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_name(self.name)
+        vim.api.nvim_buf_set_name(buf, self.name)
         self.buf = buf
     end
 
