@@ -58,8 +58,17 @@ end
 ---@return number? col_ed
 function M.visual_selection_range()
     local unpac = unpack or table.unpack
-    local _, st_r, st_c, _ = unpac(vim.fn.getpos("v"))
-    local _, ed_r, ed_c, _ = unpac(vim.fn.getpos("."))
+    local st_r, st_c, ed_r, ed_c
+
+    local cur_mode = api.nvim_get_mode().mode
+    if cur_mode == "v" then
+        _, st_r, st_c, _ = unpac(vim.fn.getpos("v"))
+        _, ed_r, ed_c, _ = unpac(vim.fn.getpos("."))
+    else
+        _, st_r, st_c, _ = unpac(vim.fn.getpos("'<"))
+        _, ed_r, ed_c, _ = unpac(vim.fn.getpos("'>"))
+    end
+
     if st_r * st_c * ed_r * ed_c == 0 then return nil end
     if st_r < ed_r or (st_r == ed_r and st_c <= ed_c) then
         return st_r - 1, st_c - 1, ed_r - 1, ed_c
@@ -133,7 +142,10 @@ function M.ask_for_confirmation_with_popup(msg_lines, on_confirm)
     local col = math.floor((editor_w - w) / 2)
 
     local win = api.nvim_open_win(buf, true, {
-        width = w, height = h, row = row, col = col,
+        width = w,
+        height = h,
+        row = row,
+        col = col,
         relative = "editor",
         border = "rounded",
     })
