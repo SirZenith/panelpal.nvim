@@ -94,6 +94,11 @@ function TabPage:show()
     local tabpage = self:get_tabpagenr()
     if not tabpage then
         vim.cmd "tabnew"
+
+        local bo = vim.bo
+        bo.bufhidden = "delete"
+        bo.buftype = "nofile"
+
         tabpage = api.nvim_get_current_tabpage()
         self.tabpagenr = tabpage
         self.winnr_vsplit = api.nvim_tabpage_list_wins(tabpage)
