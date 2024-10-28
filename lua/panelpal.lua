@@ -84,7 +84,7 @@ function M.visual_selection_text()
 
     local bufnr = 0
 
-    local ed_line = api.nvim_buf_get_lines(bufnr, ed_r, ed_c, true)[1]
+    local ed_line = api.nvim_buf_get_lines(bufnr, ed_r, ed_r + 1, true)[1]
     local delta = vim.str_utf_end(ed_line, ed_c)
 
     local list = api.nvim_buf_get_text(bufnr, st_r, st_c, ed_r, ed_c + delta, {})
