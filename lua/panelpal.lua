@@ -52,10 +52,10 @@ function M.update_method_to_line_range(method, buf)
     return line_st, line_ed
 end
 
----@return number? row_st
----@return number? col_st
----@return number? row_ed
----@return number? col_ed
+---@return number? row_st # 0-base index
+---@return number? col_st # 0-base index
+---@return number? row_ed # 0-base index
+---@return number? col_ed # 0-base index
 function M.visual_selection_range()
     local unpac = unpack or table.unpack
     local st_r, st_c, ed_r, ed_c
@@ -80,9 +80,14 @@ end
 ---@return string? text
 function M.visual_selection_text()
     local st_r, st_c, ed_r, ed_c = M.visual_selection_range()
-    if not (st_r or st_c or ed_r or ed_c) then return nil end
+    if not (st_r and st_c and ed_r and ed_c) then return nil end
 
-    local list = api.nvim_buf_get_text(0, st_r, st_c, ed_r, ed_c, {})
+    local bufnr = 0
+
+    local ed_line = api.nvim_buf_get_lines(bufnr, ed_r, ed_c, true)[1]
+    local delta = vim.str_utf_end(ed_line, ed_c)
+
+    local list = api.nvim_buf_get_text(bufnr, st_r, st_c, ed_r, ed_c + delta, {})
     local selected = table.concat(list)
     return #selected ~= 0 and selected or nil
 end
